@@ -7,11 +7,12 @@
 #include <stdio.h>
 #include <iostream>
 
-#include "opencv2/core.hpp"
-#include "opencv2/features2d.hpp"
-#include "opencv2/imgcodecs.hpp"
-#include "opencv2/highgui.hpp"
-#include "opencv2/xfeatures2d.hpp"
+#include <opencv2/core.hpp>
+#include <opencv2/features2d.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/xfeatures2d.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
 
 using namespace std;
 using namespace cv;
@@ -53,14 +54,34 @@ int main( int argc, char** argv )
   FlannBasedMatcher matcher;
   std::vector< DMatch > matches;
   matcher.match( descriptors_1, descriptors_2, matches );
+
+  //-- Step 3: Only keep the good matches
+  std::vector< DMatch > filtered_matches = MatchesFilter(matches, descriptors_1);
+  cout << "filtered Matches " << filtered_matches.size() << endl;
   Mat img_matches;
   drawMatches( img_1, keypoints_1, img_2, keypoints_2,
-               matches, img_matches, Scalar::all(-1), Scalar::all(-1),
+               filtered_matches, img_matches, Scalar::all(-1), Scalar::all(-1),
                vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
   //-- Show detected matches
   imshow( "Matches", img_matches );
   for( int i = 0; i < (int)matches.size(); i++ )
   { printf( "-- Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, matches[i].queryIdx, matches[i].trainIdx ); }
+
+  vector<Point2f> points_1, points_2; //array of feature points
+  for( int i = 0; i < filtered_matches.size(); i++ )
+  {
+   //-- Get the keypoints from the good matches
+   points_1.push_back( keypoints_1[ filtered_matches[i].queryIdx ].pt );
+   points_2.push_back( keypoints_2[ filtered_matches[i].trainIdx ].pt );
+   cout << "KeyPoint" << i <<": in left image: " << keypoints_1[ filtered_matches[i].queryIdx ].pt;
+   cout << endl <<"      and in right image: " << keypoints_2[ filtered_matches[i].trainIdx ].pt << endl;
+  }
+
+  Mat points4D;
+  triangulatePoints(projection_matrix, projection_matrix, points_1, points_2, points4D); //output 4xN reconstructed points
+  cout << projection_matrix << endl;
+  cout << "triangulated points in homogenous coordinates: " << points4D << endl;
+  
   waitKey(0);
   return 0;
 }
