@@ -1,7 +1,7 @@
 /*
  * @ SURF_FLANN Matcher 
  * @ To compile, run:
- * @ g++ fileMatcher.cpp -o fileMatcher `pkg-config --cflags --libs opencv`
+ * @ g++ ../fileMatcher/fileMatcher.cpp -o fileMatcher `pkg-config --cflags --libs opencv`
  */
 
 #include <stdio.h>
@@ -16,6 +16,11 @@
 using namespace std;
 using namespace cv;
 using namespace cv::xfeatures2d;
+
+cv::Mat projection_matrix = (Mat_<double>(3,4) << 332.7283325195312, 0, 158.5335691355958, 0, 0, 329.1090698242188, 112.7895539800684, 0, 0, 0, 1, 0); 
+
+//Function MatchesFilter to filter out bad matches (>2*minDistance)
+std::vector< DMatch > MatchesFilter(std::vector< DMatch > raw_matches, cv::Mat descriptors);
 
 int main( int argc, char** argv )
 {
@@ -32,7 +37,7 @@ int main( int argc, char** argv )
   Mat descriptors_1, descriptors_2;
 
   //-- Step 1: Detect the keypoints using SURF Detector, compute the descriptors
-  int minHessian = 400;
+  int minHessian = 1000;
   Ptr<SURF> detector = SURF::create(minHessian);
   // Fast detector and brief descriptor
   // Ptr<BriefDescriptorExtractor> brief = BriefDescriptorExtractor::create(32);
@@ -59,3 +64,29 @@ int main( int argc, char** argv )
   waitKey(0);
   return 0;
 }
+
+std::vector< DMatch > MatchesFilter(std::vector< DMatch > raw_matches, cv::Mat descriptors)
+{
+  //only keep the good matches
+  double max_dist = 0; double min_dist = 100;
+  std::vector< DMatch > good_matches;
+  //-- Quick calculation of max and min distances between keypoints
+  for( int i = 0; i < descriptors.rows; i++ )
+  { double dist = raw_matches[i].distance;
+  if( dist < min_dist ) min_dist = dist;
+  if( dist > max_dist ) max_dist = dist;
+  }
+  // printf("-- Max dist : %f \n", max_dist );
+  // printf("-- Min dist : %f \n", min_dist );
+  //-- Draw only "good" matches (i.e. whose distance is less than 2*min_dist,
+  //-- or a small arbitary value ( 0.02 ) in the event that min_dist is very
+  //-- small)
+  //-- PS.- radiusMatch can also be used here.
+  for( int i = 0; i < descriptors.rows; i++ )
+  { if( raw_matches[i].distance <= max(2*min_dist, 0.02) )
+    { good_matches.push_back( raw_matches[i]); }
+  }
+  cout << "Number of good matches: " << good_matches.size() << endl;
+
+  return good_matches;
+};
