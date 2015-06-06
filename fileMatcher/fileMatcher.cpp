@@ -1,5 +1,5 @@
 /*
- * @ SURF_FLANN Matcher 
+ * @ fileMatcher 
  * @ To compile, run:
  * @ g++ ../fileMatcher/fileMatcher.cpp -o fileMatcher `pkg-config --cflags --libs opencv`
  */
@@ -18,7 +18,11 @@ using namespace std;
 using namespace cv;
 using namespace cv::xfeatures2d;
 
-cv::Mat projection_matrix = (Mat_<double>(3,4) << 332.7283325195312, 0, 158.5335691355958, 0, 0, 329.1090698242188, 112.7895539800684, 0, 0, 0, 1, 0); 
+cv::Mat projection_matrix = (Mat_<double>(3,4) << 332.7283325195312, 0,                 158.5335691355958, 0,
+                                                  0,                 329.1090698242188, 112.7895539800684, 0,
+                                                  0,                 0,                 1,                 0); 
+// Caution for picking values from Mat: to get value of projection_matrix at row 2, column 3 (112.7895539800684)
+// is projection_matrix.at<double>(1,2) or projection_matrix.at<double>(6)
 
 //Function MatchesFilter to filter out bad matches (>2*minDistance)
 std::vector< DMatch > MatchesFilter(std::vector< DMatch > raw_matches, cv::Mat descriptors);
@@ -40,7 +44,7 @@ int main( int argc, char** argv )
   Mat descriptors_1, descriptors_2;
 
   clock_t time_render = clock()-time_start; //end of clock, counting time
-  cout<< "time for rendering: " <<((double)time_render) / CLOCKS_PER_SEC * 1000 << "ms"<< endl; //print out time
+  cout<< "time for rendering: " <<((double)time_render) / CLOCKS_PER_SEC * 1000 << " ms"<< endl; //print out time
   //-- Step 1: Detect the keypoints using SURF Detector, compute the descriptors
   int minHessian = 600;
   Ptr<SURF> detector = SURF::create(minHessian);
@@ -50,10 +54,10 @@ int main( int argc, char** argv )
   // ...
   detector->detect(img_1, keypoints_1); //Find interest points
   clock_t time_detect1 = clock()-time_start; //end of clock, counting time
-  cout<< "time for detect1: " <<((double)time_detect1) / CLOCKS_PER_SEC * 1000 << "ms"<< endl; //print out time
+  cout<< "time for detect1: " <<((double)time_detect1) / CLOCKS_PER_SEC * 1000 << " ms"<< endl; //print out time
   detector->detect(img_2, keypoints_2); 
   clock_t time_detect2 = clock()-time_start; //end of clock, counting time
-  cout<< "time for detect2: " <<((double)time_detect2) / CLOCKS_PER_SEC * 1000 << "ms"<< endl; //print out time
+  cout<< "time for detect2: " <<((double)time_detect2) / CLOCKS_PER_SEC * 1000 << " ms"<< endl; //print out time
 
   detector->compute(img_1, keypoints_1, descriptors_1); //Compute brief descriptors at each keypoint location
   detector->compute(img_2, keypoints_2, descriptors_2);
@@ -63,6 +67,9 @@ int main( int argc, char** argv )
   std::vector< DMatch > matches;
   matcher.match( descriptors_1, descriptors_2, matches );
 
+  clock_t time_descripting = clock()-time_start; //end of clock, counting time
+  cout<< "time for descripting: " <<((double)time_descripting) / CLOCKS_PER_SEC * 1000 << " ms"<< endl; //print out time
+
   //-- Step 3: Only keep the good matches
   std::vector< DMatch > filtered_matches = MatchesFilter(matches, descriptors_1);
   cout << "filtered Matches " << filtered_matches.size() << endl;
@@ -70,8 +77,11 @@ int main( int argc, char** argv )
   drawMatches( img_1, keypoints_1, img_2, keypoints_2,
                filtered_matches, img_matches, Scalar::all(-1), Scalar::all(-1),
                vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+
+  clock_t time_matching = clock()-time_start; //end of clock, counting time
+  cout<< "time for matching: " <<((double)time_matching) / CLOCKS_PER_SEC * 1000 << " ms"<< endl; //print out time
   //-- Show detected matches
-  imshow( "Matches", img_matches );
+  // imshow( "Matches", img_matches );
   // for( int i = 0; i < (int)matches.size(); i++ )
   // { printf( "-- Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, matches[i].queryIdx, matches[i].trainIdx ); }
 
@@ -81,15 +91,27 @@ int main( int argc, char** argv )
    //-- Get the keypoints from the good matches
    points_1.push_back( keypoints_1[ filtered_matches[i].queryIdx ].pt );
    points_2.push_back( keypoints_2[ filtered_matches[i].trainIdx ].pt );
-   cout << "KeyPoint" << i <<": in left image: " << keypoints_1[ filtered_matches[i].queryIdx ].pt;
-   cout << endl <<"      and in right image: " << keypoints_2[ filtered_matches[i].trainIdx ].pt << endl;
+   // cout << "KeyPoint" << i <<": in left image: " << keypoints_1[ filtered_matches[i].queryIdx ].pt;
+   // cout << endl <<"      and in right image: " << keypoints_2[ filtered_matches[i].trainIdx ].pt << endl;
   }
-
+  clock_t time_pushback = clock()-time_start; //end of clock, counting time
+  cout<< "time for pushback: " <<((double)time_pushback) / CLOCKS_PER_SEC * 1000 << " ms"<< endl; //print out time
+  // Mat mat_points_1 = Mat(points_1).reshape(1,2);
+  // Mat mat_points_2 = Mat(points_2).reshape(1,2);
+  // cout << "Mat(points_1):" << Mat(points_1) << endl;
+  // cout << "Mat(points_2):" << Mat(points_2) << endl;
+  // cout << "mat_points1:" << mat_points_1 << endl;
+  // cout << "mat_points2:" << mat_points_2 << endl;
   Mat points4D;
   triangulatePoints(projection_matrix, projection_matrix, points_1, points_2, points4D); //output 4xN reconstructed points
-  cout << projection_matrix << endl;
-  cout << "triangulated points in homogenous coordinates: " << points4D << endl;
+  // cout << projection_matrix << endl;
+  cout << "triangulated points in homogenous coordinates: " << endl << points4D << endl;
+
+  // cout << "projection_matrix.at<double>(3,2) is:" << projection_matrix.at<double>(2,1) << endl;
+  // cout << "projection_matrix.at<double>(2,3) is:" << projection_matrix.at<double>(1,2) << endl;
   
+  clock_t time_all = clock()-time_start; //end of clock, counting time
+  cout<< "time for the whole process: " <<((double)time_all) / CLOCKS_PER_SEC * 1000 << " ms"<< endl; //print out time
   waitKey(0);
   return 0;
 }
