@@ -28,6 +28,8 @@ int main( int argc, char** argv )
   if( argc != 3 )
   { printf("usage: matcher <VideoPath>\n"); return -1; }
 
+  clock_t time_start = clock(); //start of clock
+
   Mat img_1 = imread( argv[1], IMREAD_GRAYSCALE );
   Mat img_2 = imread( argv[2], IMREAD_GRAYSCALE );
 
@@ -37,15 +39,21 @@ int main( int argc, char** argv )
   vector<KeyPoint> keypoints_1, keypoints_2;
   Mat descriptors_1, descriptors_2;
 
+  clock_t time_render = clock()-time_start; //end of clock, counting time
+  cout<< "time for rendering: " <<((double)time_render) / CLOCKS_PER_SEC * 1000 << "ms"<< endl; //print out time
   //-- Step 1: Detect the keypoints using SURF Detector, compute the descriptors
-  int minHessian = 1000;
+  int minHessian = 600;
   Ptr<SURF> detector = SURF::create(minHessian);
   // Fast detector and brief descriptor
   // Ptr<BriefDescriptorExtractor> brief = BriefDescriptorExtractor::create(32);
   // Ptr<FastFeatureDetector> detector = FastFeatureDetector::create(10, true);
   // ...
   detector->detect(img_1, keypoints_1); //Find interest points
+  clock_t time_detect1 = clock()-time_start; //end of clock, counting time
+  cout<< "time for detect1: " <<((double)time_detect1) / CLOCKS_PER_SEC * 1000 << "ms"<< endl; //print out time
   detector->detect(img_2, keypoints_2); 
+  clock_t time_detect2 = clock()-time_start; //end of clock, counting time
+  cout<< "time for detect2: " <<((double)time_detect2) / CLOCKS_PER_SEC * 1000 << "ms"<< endl; //print out time
 
   detector->compute(img_1, keypoints_1, descriptors_1); //Compute brief descriptors at each keypoint location
   detector->compute(img_2, keypoints_2, descriptors_2);
@@ -64,8 +72,8 @@ int main( int argc, char** argv )
                vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
   //-- Show detected matches
   imshow( "Matches", img_matches );
-  for( int i = 0; i < (int)matches.size(); i++ )
-  { printf( "-- Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, matches[i].queryIdx, matches[i].trainIdx ); }
+  // for( int i = 0; i < (int)matches.size(); i++ )
+  // { printf( "-- Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, matches[i].queryIdx, matches[i].trainIdx ); }
 
   vector<Point2f> points_1, points_2; //array of feature points
   for( int i = 0; i < filtered_matches.size(); i++ )
