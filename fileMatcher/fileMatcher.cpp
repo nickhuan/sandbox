@@ -22,6 +22,12 @@ using namespace cv::xfeatures2d;
 Mat camera_matrix = (Mat_<double>(3,3) << 334.6936985593561,                 0, 158.8031671890114,
                                                           0, 329.5380406075342, 113.1013024157152,
                                                           0,                 0,                 1); //Microsoft HD3000 intrinsics
+//RANSAC for finding Essential Matrix
+double prob = 0.999; //desirable level of confidence (probability) that the estimated matrix is correct.
+double threshold = 1.0; 
+//the maximum distance from a point to an epipolar line in pixels, 
+//beyond which the point is considered an outlier and is not used for computing the final fundamental matrix. 
+//It can be set to something like 1-3, depending on the accuracy of the point localization, image resolution, and the image noise.
 
 // Caution for picking values from Mat: to get value of projection_matrix at row 2, column 3 (113.1013024157152)
 // is camera_matrix.at<double>(1,2) or projection_matrix.at<double>(6)
@@ -55,18 +61,28 @@ int main( int argc, char** argv )
 
   //-- Step 1: Detect the keypoints using SURF Detector, compute the descriptors
   int minHessian = 600;
-  Ptr<SURF> detector = SURF::create(minHessian);
-  // Fast detector and brief descriptor
-  // Ptr<BriefDescriptorExtractor> brief = BriefDescriptorExtractor::create(32);
-  // Ptr<FastFeatureDetector> detector = FastFeatureDetector::create(10, true);
+  Ptr<SURF> surf = SURF::create(minHessian);
+  // Fast surf and brief descriptor
+  Ptr<FastFeatureDetector> fast = FastFeatureDetector::create(10, true);
+  Ptr<BriefDescriptorExtractor> brief = BriefDescriptorExtractor::create(32);
   // ...
-  detector->detect(img_1, keypoints_1); //Find interest points
   cout << "Clock:" << clock() << endl; //print current time
-  detector->detect(img_2, keypoints_2); 
-  cout << "Clock:" << clock() << endl; //print current time
+  fast->detect(img_1, keypoints_1); //Find interest points
+  cout << "kp1 Clock:" << clock() << endl; //print current time
+  fast->detect(img_2, keypoints_2); 
+  cout << "kp2 Clock:" << clock() << endl; //print current time
 
-  detector->compute(img_1, keypoints_1, descriptors_1); //Compute brief descriptors at each keypoint location
-  detector->compute(img_2, keypoints_2, descriptors_2);
+  brief->compute(img_1, keypoints_1, descriptors_1); //Compute brief descriptors at each keypoint location
+  cout << "desc1 Clock:" << clock() << endl; //print current time
+  brief->compute(img_2, keypoints_2, descriptors_2);
+  cout << "desc2 Clock:" << clock() << endl; //print current time
+  cout << "keypoints1 size: " << keypoints_1.size() <<" -- keypoints_2 size: " << keypoints_2.size() << endl;
+
+  cv::Size s = descriptors_1.size();
+  int rows = s.height;
+  int cols = s.width;
+  cout << "desc_size: " << s << "rows: "<< rows << "column: "<< cols << endl;
+  // cout << "desc: " << endl << descriptors_1 << endl; //print out full descriptor in mat
 
   //-- Step 2: Matching descriptor vectors using FLANN matcher
   FlannBasedMatcher matcher;
@@ -109,7 +125,7 @@ int main( int argc, char** argv )
   // cout << "mat_points2:" << mat_points_2 << endl;
 
   Mat rotation_matrix, translation_matrix, mask;
-  Mat essential_matrix = findEssentialMat(points_1, points_2, focal, principle_point, RANSAC, 0.999, 1.0, mask);
+  Mat essential_matrix = findEssentialMat(points_1, points_2, focal, principle_point, RANSAC, prob, threshold, mask);
   recoverPose(essential_matrix, points_1, points_2, rotation_matrix, translation_matrix, focal, principle_point, mask);
   cout << "rotation_matrix:" << endl << rotation_matrix << endl << "translation_matrix:" << endl << translation_matrix << endl;
   cout << "mask:" << endl << mask << endl;
