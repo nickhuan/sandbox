@@ -1,7 +1,7 @@
 /*
  * @ fileMatcher 
  * @ To compile, run:
- * @ g++ ../fileMatcher/fileMatcher.cpp -o fileMatcher `pkg-config --cflags --libs opencv`
+  g++ ../fileMatcher/fileMatcher.cpp -o fileMatcher `pkg-config --cflags --libs opencv`
  */
 
 #include <stdio.h>
@@ -33,7 +33,7 @@ double threshold = 1.0;
 // is camera_matrix.at<double>(1,2) or projection_matrix.at<double>(6)
 
 //Function MatchesFilter to filter out bad matches (>2*minDistance)
-std::vector< DMatch > MatchesFilter(std::vector< DMatch > raw_matches, cv::Mat descriptors);
+std::vector<DMatch> MatchesFilter(std::vector<DMatch> raw_matches, cv::Mat descriptors);
 
 int main( int argc, char** argv )
 {
@@ -57,24 +57,41 @@ int main( int argc, char** argv )
   vector<KeyPoint> keypoints_1, keypoints_2;
   Mat descriptors_1, descriptors_2;
 
+  /* detection, description matching methods*/
+  // // Option Package 1 -- SURF detector + SURF descriptor + FLANN matcher
+  int minHessian = 600;
+  // cout << "Minimum Hessian Number:";
+  // cin >> minHessian;
+  Ptr<SURF> keypointDetector = SURF::create(minHessian);
+  Ptr<SURF> descriptorExtractor = SURF::create(minHessian);
+  FlannBasedMatcher flannMatcher;//not a pointer, need to define a pointer below
+  Ptr<DescriptorMatcher> descriptorMatcher = &flannMatcher; 
+  // // Option Package 2 -- FAST detector + BRIEF descriptor + binary Matcher
+  // Ptr<FastFeatureDetector> keypointDetector = FastFeatureDetector::create(10, true);
+  // Ptr<BriefDescriptorExtractor> descriptorExtractor = BriefDescriptorExtractor::create(32);
+  // // Ptr<BinaryDescriptorMatcher> descriptorMatcher = cv::line_descriptor::BinaryDescriptorMatcher::createBinaryDescriptorMatcher();
+  // BFMatcher bfMatcher;
+  // Ptr<DescriptorMatcher> descriptorMatcher = &bfMatcher;
+
   cout << "Clock:" << clock() << endl; //print current time
 
   //-- Step 1: Detect the keypoints using SURF Detector, compute the descriptors
-  int minHessian = 600;
-  Ptr<SURF> surf = SURF::create(minHessian);
-  // Fast surf and brief descriptor
-  Ptr<FastFeatureDetector> fast = FastFeatureDetector::create(10, true);
-  Ptr<BriefDescriptorExtractor> brief = BriefDescriptorExtractor::create(32);
-  // ...
+
   cout << "Clock:" << clock() << endl; //print current time
-  fast->detect(img_1, keypoints_1); //Find interest points
+  keypointDetector->detect(img_1, keypoints_1); //Find interest points
+  cout << "No. of keypoints in img 1(before): " << keypoints_1.size() << endl;
+  KeyPointsFilter::retainBest(keypoints_1, 100); //only keep the best 100 keypoints
+  cout << "No. of keypoints in img 1(after): " << keypoints_1.size() << endl;
   cout << "kp1 Clock:" << clock() << endl; //print current time
-  fast->detect(img_2, keypoints_2); 
+  keypointDetector->detect(img_2, keypoints_2); 
+  cout << "No. of keypoints in img 2(before): " << keypoints_2.size() << endl;
+  KeyPointsFilter::retainBest(keypoints_2, 100); //only keep the best 100 keypoints
+  cout << "No. of keypoints in img 2(after): " << keypoints_2.size() << endl;
   cout << "kp2 Clock:" << clock() << endl; //print current time
 
-  brief->compute(img_1, keypoints_1, descriptors_1); //Compute brief descriptors at each keypoint location
+  descriptorExtractor->compute(img_1, keypoints_1, descriptors_1); //Compute brief descriptors at each keypoint location
   cout << "desc1 Clock:" << clock() << endl; //print current time
-  brief->compute(img_2, keypoints_2, descriptors_2);
+  descriptorExtractor->compute(img_2, keypoints_2, descriptors_2);
   cout << "desc2 Clock:" << clock() << endl; //print current time
   cout << "keypoints1 size: " << keypoints_1.size() <<" -- keypoints_2 size: " << keypoints_2.size() << endl;
 
@@ -85,15 +102,15 @@ int main( int argc, char** argv )
   // cout << "desc: " << endl << descriptors_1 << endl; //print out full descriptor in mat
 
   //-- Step 2: Matching descriptor vectors using FLANN matcher
-  FlannBasedMatcher matcher;
-  std::vector< DMatch > matches;
-  matcher.match( descriptors_1, descriptors_2, matches );
+  std::vector<DMatch> matches;
+  descriptorMatcher->match( descriptors_1, descriptors_2, matches );
 
   cout << "Clock:" << clock() << endl; //print current time
 
   //-- Step 3: Only keep the good matches
-  std::vector< DMatch > filtered_matches = MatchesFilter(matches, descriptors_1);
+  std::vector<DMatch> filtered_matches = MatchesFilter(matches, descriptors_1);
   cout << "filtered Matches " << filtered_matches.size() << endl;
+  cout << "print out matches matrix:" << endl << filtered_matches[1].imgIdx << endl;
   Mat img_matches;
   drawMatches( img_1, keypoints_1, img_2, keypoints_2,
                filtered_matches, img_matches, Scalar::all(-1), Scalar::all(-1),
@@ -101,7 +118,7 @@ int main( int argc, char** argv )
 
   cout << "Clock:" << clock() << endl; //print current time
   //-- Show detected matches
-  // imshow( "Matches", img_matches );
+  imshow( "Matches", img_matches );
   // for( int i = 0; i < (int)matches.size(); i++ )
   // { printf( "-- Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, matches[i].queryIdx, matches[i].trainIdx ); }
 
@@ -117,8 +134,8 @@ int main( int argc, char** argv )
   }
   cout << "Clock:" << clock() << endl; //print current time
 
-  // Mat mat_points_1 = Mat(points_1).reshape(1,2);
-  // Mat mat_points_2 = Mat(points_2).reshape(1,2);   
+  Mat mat_points_1 = Mat(points_1).reshape(1,2);
+  Mat mat_points_2 = Mat(points_2).reshape(1,2);   
   // cout << "Mat(points_1):" << Mat(points_1) << endl;
   // cout << "Mat(points_2):" << Mat(points_2) << endl;
   // cout << "mat_points1:" << mat_points_1 << endl;
@@ -128,7 +145,29 @@ int main( int argc, char** argv )
   Mat essential_matrix = findEssentialMat(points_1, points_2, focal, principle_point, RANSAC, prob, threshold, mask);
   recoverPose(essential_matrix, points_1, points_2, rotation_matrix, translation_matrix, focal, principle_point, mask);
   cout << "rotation_matrix:" << endl << rotation_matrix << endl << "translation_matrix:" << endl << translation_matrix << endl;
-  cout << "mask:" << endl << mask << endl;
+  cout << "points1:" << endl << points_1 << endl;
+  cout << "points2:" << endl << points_2 << endl;
+  cout << "points1:" << endl << mat_points_1 << endl;
+  cout << "points2:" << endl << mat_points_2 << endl;
+
+  // std::vector<cv::DMatch> inliers;  
+  // for (size_t i=0; i<inliersMask.size(); i++)  
+  // {  
+  // if (inliersMask[i])  
+  // inliers.push_back(matches[i]);  
+  // }  
+  // cout << "mask:" << endl << mask.t() << endl;
+  // Mat filtered_points_1, filtered_points_2;
+  // cvCopy(mat_points_1.t(), filtered_points_1, mask);
+  // cvCopy(mat_points_2.t(), filtered_points_2, mask);
+  Mat mat_mask;
+  vconcat(mask.t(), mask.t(), mat_mask);
+  cout << "mat mask:" << endl << mat_mask << endl;
+  Mat mask_points_1, mask_points_2;
+  mat_points_1.copyTo(mask_points_1, mask.t());
+  mat_points_2.copyTo(mask_points_2, mask.t());
+  cout << "masked1:" << endl << mask_points_1 << endl;
+  cout << "masked2:" << endl << mask_points_2 << endl;
 
   //-- Step 5: Triangulation
   Mat projection_matrix_1 = (Mat_<double>(3,4) << 1, 0, 0, 0,
@@ -144,7 +183,7 @@ int main( int argc, char** argv )
 
   Mat points4D;
   triangulatePoints(projection_matrix_1, projection_matrix_2, points_1, points_2, points4D); //output 4xN reconstructed points
-  cout << "triangulated points in homogenous coordinates: " << endl << points4D << endl;
+  // cout << "triangulated points in homogenous coordinates: " << endl << points4D << endl;
 
   //Time counting to measure performance
   clock_t time_all = clock()-time_start; //end of clock, counting time
@@ -153,11 +192,11 @@ int main( int argc, char** argv )
   return 0;
 }
 
-std::vector< DMatch > MatchesFilter(std::vector< DMatch > raw_matches, cv::Mat descriptors)
+std::vector<DMatch> MatchesFilter(std::vector<DMatch> raw_matches, cv::Mat descriptors)
 {
   //only keep the good matches
   double max_dist = 0; double min_dist = 100;
-  std::vector< DMatch > good_matches;
+  std::vector<DMatch> good_matches;
   //-- Quick calculation of max and min distances between keypoints
   for( int i = 0; i < descriptors.rows; i++ )
   { double dist = raw_matches[i].distance;

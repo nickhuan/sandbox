@@ -2,7 +2,7 @@
  * @ 3D-to-2D approach for pose estimation using perspective n-points 
  * @ Software Requirement: OpenCV 3.0.0 rc1
  * @ To compile, run:
- * @ g++ keypointVO.cpp -o keypointVO `pkg-config --cflags --libs opencv`
+ * @ g++ ../demo/demo.cpp -o demo `pkg-config --cflags --libs opencv`
  */
 
 #include <stdio.h>
@@ -16,8 +16,6 @@
 #include <opencv2/xfeatures2d.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/line_descriptor.hpp>
-
-#include "tcpServer.hpp"
 
 using namespace std;
 using namespace cv;
